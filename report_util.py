@@ -40,10 +40,13 @@ def report_to_markdown(
         data = filter_important_report(data)
     meta = meta or {}
     cs = data.get("categoryStats") or {}
+    period = meta.get("report_period")
+    day_tag = meta.get("report_day") or ("昨日" if data.get("day") == "yesterday" else "今日")
     title = "亚马逊邮件重要提醒" if important_only else "亚马逊邮件日报"
     lines = [
         f"# {title} — {data.get('date', '')}",
         "",
+        f"- 统计范围：{period or (day_tag + '全天')}",
         f"- 拉取邮件：{meta.get('fetched', data.get('total', 0))} 封",
     ]
     if important_only:

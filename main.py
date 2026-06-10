@@ -11,7 +11,7 @@ import re
 import threading
 import time
 import webbrowser
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -731,10 +731,122 @@ def enrich_report(result: dict, raw_total: Optional[int] = None) -> dict:
     return result
 
 
+CHINA_TZ = timezone(timedelta(hours=8))
+
+
 def resolve_target_date(day: str) -> date:
     if day == "yesterday":
         return date.today() - timedelta(days=1)
     return date.today()
+
+
+def parse_email_received_at(msg) -> Optional[datetime]:
+    try:
+        dt = parsedate_to_datetime(msg.get("Date", ""))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(CHINA_TZ)
+    except Exception:
+        return None
+
+
+def resolve_rolling_report_window(
+    end_hour: int = 8,
+    end_minute: int = 0,
+) -> tuple[datetime, datetime]:
+    """滚动 24 小时：昨日 end_hour 至今日 end_hour（适合每天 8:30 推送）。"""
+    now = datetime.now(CHINA_TZ)
+    end = now.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0)
+    if now < end:
+        end -= timedelta(days=1)
+    start = end - timedelta(days=1)
+    return start, end
+
+
+def format_window_label(start: datetime, end: datetime) -> str:
+    return f"{start.strftime('%Y-%m-%d %H:%M')} ~ {end.strftime('%Y-%m-%d %H:%M')}"
+
+
+def fetch_emails_for_window(
+    account: AccountConfig,
+    start: datetime,
+    end: datetime,
+    max_emails: int = 150,
+) -> List[dict]:
+    server_host, server_port = IMAP_SERVERS.get(account.type, ("", 0))
+    if not server_host:
+        raise ValueError(f"不支持的邮箱类型: {account.type}")
+
+    emails = []
+    try:
+        mail = imaplib.IMAP4_SSL(server_host, server_port)
+        mail.login(account.email, account.password)
+
+        if account.type in NETEASE_TYPES:
+            send_netease_imap_id(mail)
+
+        select_inbox(mail)
+
+        since_str = start.date().strftime("%d-%b-%Y")
+        before_str = (end.date() + timedelta(days=1)).strftime("%d-%b-%Y")
+        status, data = mail.search(None, "SINCE", since_str, "BEFORE", before_str)
+
+        if status != "OK" or not data[0]:
+            mail.logout()
+            return []
+
+        ids = data[0].split()[-max_emails:]
+
+        for uid in reversed(ids):
+            try:
+                _, msg_data = mail.fetch(uid, "(RFC822)")
+                if not msg_data or not msg_data[0]:
+                    continue
+                raw = msg_data[0][1]
+                msg = email.message_from_bytes(raw)
+
+                received_at = parse_email_received_at(msg)
+                if received_at is None:
+                    continue
+                if received_at < start or received_at > end:
+                    continue
+
+                subject = decode_str(msg.get("Subject", "（无主题）"))
+                from_addr = decode_str(msg.get("From", ""))
+                body = get_email_body(msg)
+
+                emails.append({
+                    "account": account.name or account.email,
+                    "from": from_addr,
+                    "time": received_at.strftime("%H:%M"),
+                    "subject": subject,
+                    "body": body,
+                    "received_at": received_at.isoformat(),
+                })
+            except Exception as e:
+                print(f"解析邮件出错: {e}")
+                continue
+
+        mail.logout()
+    except imaplib.IMAP4.error as e:
+        msg = str(e)
+        hint = ""
+        if account.type in NETEASE_TYPES:
+            hint = "。请确认：1) 已开启 IMAP  2) 使用的是授权码而非登录密码  3) 163 网页版设置里允许第三方客户端"
+        raise HTTPException(
+            status_code=400,
+            detail=f"{account.email} 登录失败：{msg}{hint}",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        msg = str(e)
+        hint = ""
+        if account.type in NETEASE_TYPES and ("Unsafe Login" in msg or "收件箱" in msg or "SELECT" in msg):
+            hint = "。网易邮箱需使用 IMAP 授权码，并在网页版 设置→POP3/SMTP/IMAP 中开启 IMAP"
+        raise HTTPException(status_code=500, detail=f"{account.email} 读取失败：{msg}{hint}")
+
+    return emails
 
 
 def fetch_emails_for_day(
@@ -825,12 +937,13 @@ def analyze_with_gpt(
     focus: str,
     system_prompt: str = None,
     report_date: Optional[date] = None,
+    period_label: Optional[str] = None,
 ) -> dict:
     if not is_api_configured():
         raise HTTPException(status_code=400, detail="请先在「设置」配置 AI 分析引擎（推荐 DeepSeek）")
 
     report_date = report_date or date.today()
-    day_label = "昨日" if report_date < date.today() else "今日"
+    day_label = period_label or ("昨日" if report_date < date.today() else "今日")
 
     raw_total = len(emails)
     others, delivery = split_delivery_emails(emails)
