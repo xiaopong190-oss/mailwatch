@@ -71,10 +71,12 @@ def run_daily() -> Path:
     print(f"报告已保存: {out}")
 
     webhook = __import__("os").getenv("DINGTALK_WEBHOOK", "").strip()
+    secret = __import__("os").getenv("DINGTALK_SECRET", "").strip()
     if webhook:
-        title = f"MailWatch 日报 {date.today().isoformat()}"
-        push_dingtalk(webhook, title, md)
-        print("已推送到钉钉")
+        title = f"MailWatch 重要邮件 {date.today().isoformat()}"
+        ding_md = report_to_markdown(result, meta, important_only=True)
+        push_dingtalk(webhook, title, ding_md, secret=secret)
+        print("已推送到钉钉（仅重要邮件）")
     else:
         print("未配置 DINGTALK_WEBHOOK，跳过钉钉推送")
 

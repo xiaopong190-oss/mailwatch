@@ -1,0 +1,80 @@
+MailWatch — GitHub 云端定时（不用本地电脑）
+==========================================
+
+用 GitHub Actions 每天 08:30（北京时间）自动：
+  读邮箱 → AI 分析 → 推钉钉
+
+本地电脑可以关机，不必再跑「安装定时任务.bat」。
+
+【第一步】把代码推到 GitHub
+
+  仓库：https://github.com/xiaopong190-oss/mailwatch
+
+  本地有新增文件时：
+    cd D:\Projects\mailwatch
+    git add -A
+    git commit -m "add github actions daily report"
+    git push
+
+【第二步】在 GitHub 网页配置 Secrets
+
+  打开：仓库 → Settings → Secrets and variables → Actions → New repository secret
+
+  必填：
+    OPENAI_API_KEY      DeepSeek 或 OpenAI 的 Key
+    ACCOUNTS_JSON       三个邮箱的 JSON（见下方格式）
+
+  建议填写：
+    AI_PROVIDER         deepseek
+    OPENAI_BASE_URL     https://api.deepseek.com
+    OPENAI_MODEL        deepseek-chat
+    DINGTALK_WEBHOOK    钉钉机器人 Webhook 完整地址
+    DINGTALK_SECRET     加签 Secret（SEC 开头，没有可留空或不建）
+
+  ACCOUNTS_JSON 示例（整段复制为一行 secret，或保持格式化 JSON 均可）：
+
+  {
+    "focus": "亚马逊运营相关邮件",
+    "amazon_only": true,
+    "accounts": [
+      {
+        "type": "163",
+        "email": "邮箱1@163.com",
+        "password": "IMAP授权码",
+        "name": "店铺A"
+      },
+      {
+        "type": "163",
+        "email": "邮箱2@163.com",
+        "password": "IMAP授权码",
+        "name": "店铺B"
+      },
+      {
+        "type": "163",
+        "email": "邮箱3@163.com",
+        "password": "IMAP授权码",
+        "name": "店铺C"
+      }
+    ]
+  }
+
+  可从本机 accounts.json 复制内容（含真实密码），只贴在 GitHub Secret 里，不要提交到代码库。
+
+【第三步】启用 Actions 并测试
+
+  仓库 → Actions → 左侧「MailWatch Daily Report」
+  → Run workflow → Run workflow（手动跑一次测试）
+
+  成功：钉钉收到消息；Actions 页显示绿色 ✓
+  报告文件可在该次运行的 Artifacts 里下载
+
+【第四步】关掉本地计划任务（可选）
+
+  Win+R → taskschd.msc → 删除「MailWatch-Daily」
+  以后只靠 GitHub 定时即可。
+
+【注意】
+
+  1. 163/QQ 邮箱可能拦截海外 IP，GitHub 服务器在国外，若 IMAP 失败需在邮箱里开「客户端授权」或换 Gmail。
+  2. Secrets 相当于密码，不要写在代码里、不要发到聊天。
+  3. 私有仓库也可用 Actions；免费额度一般够每天跑一次。

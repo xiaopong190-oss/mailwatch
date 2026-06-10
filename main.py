@@ -147,6 +147,11 @@ class ConfigRequest(BaseModel):
     base_url: Optional[str] = None
 
 
+class DingTalkRequest(BaseModel):
+    webhook: Optional[str] = None
+    secret: Optional[str] = None
+
+
 def get_provider() -> str:
     provider = os.getenv("AI_PROVIDER", "deepseek").strip().lower()
     if provider in ("hermes", "nous"):
@@ -360,6 +365,41 @@ def write_env(
     load_dotenv(ENV_PATH, override=True)
 
 
+def write_env_var(key: str, value: str) -> None:
+    lines = []
+    if ENV_PATH.exists():
+        lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
+    new_lines = []
+    seen = False
+    for line in lines:
+        k = line.split("=", 1)[0].strip() if "=" in line else ""
+        if k == key:
+            new_lines.append(f"{key}={value}")
+            seen = True
+        else:
+            new_lines.append(line)
+    if not seen:
+        new_lines.append(f"{key}={value}")
+    ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    os.environ[key] = value
+    load_dotenv(ENV_PATH, override=True)
+
+
+def get_dingtalk_webhook() -> str:
+    reload_env()
+    return os.getenv("DINGTALK_WEBHOOK", "").strip()
+
+
+def get_dingtalk_secret() -> str:
+    reload_env()
+    return os.getenv("DINGTALK_SECRET", "").strip()
+
+
+def is_dingtalk_configured() -> bool:
+    wh = get_dingtalk_webhook()
+    return bool(wh and "access_token=" in wh)
+
+
 def repair_stale_env() -> None:
     """Fix .env left over from Hermes/Nous when user switched to DeepSeek."""
     if not ENV_PATH.exists():
@@ -394,7 +434,46 @@ def config_status():
         "model": cfg["model"],
         "base_url": cfg["base_url"],
         "api_key_hint": "sk-..." if cfg["api_key"] else "sk-...",
+        "dingtalk_configured": is_dingtalk_configured(),
+        "dingtalk_secret_configured": bool(get_dingtalk_secret()),
     }
+
+
+@app.post("/config/dingtalk")
+def save_dingtalk(req: DingTalkRequest):
+    reload_env()
+    webhook = (req.webhook or "").strip() or get_dingtalk_webhook()
+    secret = (req.secret or "").strip() or get_dingtalk_secret()
+    if not webhook:
+        raise HTTPException(status_code=400, detail="请填写钉钉群机器人 Webhook")
+    if "access_token=" not in webhook:
+        raise HTTPException(status_code=400, detail="Webhook 需包含 access_token=...")
+    if secret and not secret.startswith("SEC"):
+        raise HTTPException(status_code=400, detail="加签 Secret 通常以 SEC 开头")
+    write_env_var("DINGTALK_WEBHOOK", webhook)
+    if (req.secret or "").strip():
+        write_env_var("DINGTALK_SECRET", (req.secret or "").strip())
+    return {"ok": True}
+
+
+@app.post("/config/dingtalk/test")
+def test_dingtalk():
+    from report_util import push_dingtalk
+
+    webhook = get_dingtalk_webhook()
+    secret = get_dingtalk_secret()
+    if not webhook:
+        raise HTTPException(status_code=400, detail="请先在「定时设置」配置钉钉 Webhook")
+    try:
+        push_dingtalk(
+            webhook,
+            "MailWatch 测试",
+            "**MailWatch** 钉钉连接正常 ✓\n\n每天 8:30 会自动推送风险/警告/待处理/重要邮件。",
+            secret=secret,
+        )
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"钉钉推送失败: {e}") from e
 
 
 @app.post("/config")

@@ -14,12 +14,17 @@ MailWatch — 只读 · 分类 · 提醒
    - DeepSeek：platform.deepseek.com 创建 API Key → 设置里填入 → 测试连接
    - OpenAI 官方：填 sk- 开头的 Key
 
-3. 钉钉（可选）：.env 里填 DINGTALK_WEBHOOK
+3. 钉钉：网页「定时设置」填群机器人 Webhook → 测试推送
+   （机器人安全设置关键词填 MailWatch）
 
-【每天自动跑】
+【每天自动跑 — 二选一】
 
-  右键「安装定时任务.ps1」→ 使用 PowerShell 运行
-  （默认每天 8:30，也可双击「每日报告.bat」手动测试）
+  A. GitHub 云端（推荐，电脑可关机）
+     见「GitHub云端部署.txt」→ 配置 Secrets → Actions 每天 8:30 跑
+
+  B. 本机 Windows 计划任务
+     双击「install-schedule.bat」
+     日志：reports\scheduler.log
 
 【输出】
 

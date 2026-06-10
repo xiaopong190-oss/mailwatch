@@ -407,7 +407,7 @@ input[type=password]:not(:placeholder-shown) { letter-spacing: 3px; }
           <div class="toggle-row">
             <div class="toggle-info">
               <div class="tlbl">启用每日自动分析</div>
-              <div class="tsub">需保持页面打开；整点前1分钟内检测</div>
+              <div class="tsub">仅网页内分析，需保持页面打开；推钉钉请用下方「Windows 计划任务」</div>
             </div>
             <label class="toggle">
               <input type="checkbox" id="sched-on" onchange="saveSchedule()" />
@@ -429,6 +429,27 @@ input[type=password]:not(:placeholder-shown) { letter-spacing: 3px; }
             <label>选择分析邮箱</label>
             <div id="sched-accounts" style="margin-top:4px"></div>
           </div>
+        </div>
+        <div class="card">
+          <div class="card-title">钉钉推送（重要邮件）</div>
+          <p class="hint" style="margin:-4px 0 12px">每天自动任务会分析全部邮箱，并把<strong>风险 / 账号警告 / 待处理 / 重要</strong>邮件推到公司钉钉群（不含广告、配送汇总）</p>
+          <div class="field">
+            <label>钉钉群机器人 Webhook</label>
+            <input type="password" id="dingtalk-webhook" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>加签 Secret（选「加签」安全方式时填写）</label>
+            <input type="password" id="dingtalk-secret" placeholder="SEC..." autocomplete="off" />
+            <p class="hint" id="dingtalk-hint" style="margin-top:4px">还需复制 Webhook 地址（https://oapi.dingtalk.com/robot/send?access_token=...）。关键词安全方式填 MailWatch</p>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:4px;justify-content:center" onclick="saveDingTalk()">保存钉钉配置</button>
+          <button class="btn" style="width:100%;margin-top:8px;justify-content:center" onclick="testDingTalk()">测试钉钉推送</button>
+          <p class="hint" id="dingtalk-test-result" style="margin-top:10px"></p>
+        </div>
+        <div class="card">
+          <div class="card-title">Windows 计划任务（推荐）</div>
+          <p class="hint" style="margin:-4px 0 12px">电脑无需开浏览器，每天 8:30 自动跑三个邮箱并推钉钉。双击项目文件夹里的 <b>安装定时任务.bat</b> 即可。</p>
+          <p class="hint">手动测试：双击 <b>每日报告.bat</b>，看是否收到钉钉消息。</p>
         </div>
         <div class="card">
           <div class="card-title">运行记录</div>
@@ -932,7 +953,7 @@ function showPage(name, el) {
   document.getElementById('topbar-title').textContent = TITLES[name][0];
   document.getElementById('topbar-sub').textContent = TITLES[name][1];
   document.getElementById('run-btn').style.display = name === 'report' ? '' : 'none';
-  if (name === 'schedule') renderSchedulePage();
+  if (name === 'schedule') loadSchedulePage();
   if (name === 'settings') loadSettingsPage();
 }
 
@@ -941,6 +962,121 @@ async function loadSettingsPage() {
     const res = await fetch('/config/status');
     if (res.ok) applyConfigToForm(await res.json());
   } catch {}
+}
+
+function updateDingTalkHint(configured, secretConfigured) {
+  const el = document.getElementById('dingtalk-hint');
+  const input = document.getElementById('dingtalk-webhook');
+  const sec = document.getElementById('dingtalk-secret');
+  if (!el || !input) return;
+  if (configured) {
+    el.textContent = '✓ 已保存。Webhook 和 Secret 留空保存不会修改';
+    el.style.color = 'var(--green)';
+    input.placeholder = '已保存，留空不修改';
+    if (sec) sec.placeholder = secretConfigured ? '已保存，留空不修改' : 'SEC...（加签方式必填）';
+  } else {
+    el.textContent = '复制 Webhook 地址 + 加签 Secret（SEC开头）。或用关键词方式填 MailWatch';
+    el.style.color = 'var(--text3)';
+    input.placeholder = 'https://oapi.dingtalk.com/robot/send?access_token=...';
+    if (sec) sec.placeholder = 'SEC...';
+  }
+}
+
+async function loadSchedulePage() {
+  renderSchedulePage();
+  try {
+    const res = await fetch('/config/status');
+    if (res.ok) {
+      const data = await res.json();
+      updateDingTalkHint(!!data.dingtalk_configured, !!data.dingtalk_secret_configured);
+    }
+  } catch {}
+  bindDingTalkAutoSave();
+}
+
+let dingTalkSaveTimer = null;
+
+function bindDingTalkAutoSave() {
+  const el = document.getElementById('dingtalk-webhook');
+  if (!el || el._mwBound) return;
+  el._mwBound = true;
+  const schedule = () => {
+    clearTimeout(dingTalkSaveTimer);
+    dingTalkSaveTimer = setTimeout(() => saveDingTalk(false), 600);
+  };
+  el.addEventListener('input', schedule);
+  el.addEventListener('blur', () => saveDingTalk(false));
+  const sec = document.getElementById('dingtalk-secret');
+  if (sec && !sec._mwBound) {
+    sec._mwBound = true;
+    sec.addEventListener('input', schedule);
+    sec.addEventListener('blur', () => saveDingTalk(false));
+  }
+}
+
+async function saveDingTalk(showToast) {
+  if (showToast === undefined) showToast = true;
+  const webhook = (document.getElementById('dingtalk-webhook')?.value || '').trim();
+  const secret = (document.getElementById('dingtalk-secret')?.value || '').trim();
+  if (!webhook) {
+    try {
+      const st = await fetch('/config/status');
+      if (st.ok) {
+        const s = await st.json();
+        if (!s.dingtalk_configured) {
+          if (showToast) toast('请填写钉钉 Webhook');
+          return;
+        }
+      } else {
+        if (showToast) toast('请填写钉钉 Webhook');
+        return;
+      }
+    } catch {
+      if (showToast) toast('请填写钉钉 Webhook');
+      return;
+    }
+  } else if (!webhook.includes('access_token=')) {
+    if (showToast) toast('Webhook 格式不正确');
+    return;
+  }
+  try {
+    const res = await fetch('/config/dingtalk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhook, secret })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '保存失败');
+    }
+    try {
+      const st = await fetch('/config/status');
+      if (st.ok) {
+        const s = await st.json();
+        updateDingTalkHint(true, !!s.dingtalk_secret_configured);
+      } else updateDingTalkHint(true, !!secret);
+    } catch { updateDingTalkHint(true, !!secret); }
+    if (showToast) toast('钉钉配置已保存 ✓');
+  } catch (e) {
+    if (showToast) toast(e.message || '保存失败');
+  }
+}
+
+async function testDingTalk() {
+  const el = document.getElementById('dingtalk-test-result');
+  el.textContent = '测试中...';
+  el.style.color = 'var(--text3)';
+  await saveDingTalk(false);
+  try {
+    const res = await fetch('/config/dingtalk/test', { method: 'POST' });
+    const text = await res.text();
+    if (!res.ok) throw new Error(parseApiErrorText(text, res.status));
+    el.textContent = '✓ 测试消息已发到钉钉群，请在群里查看';
+    el.style.color = 'var(--green)';
+  } catch (e) {
+    el.textContent = '✗ ' + (e.message || '推送失败');
+    el.style.color = 'var(--red)';
+  }
 }
 
 async function saveApiKeyFromSettings() {

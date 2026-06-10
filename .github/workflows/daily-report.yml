@@ -1,0 +1,50 @@
+name: MailWatch Daily Report
+
+on:
+  schedule:
+    # 北京时间每天 08:30（UTC+8 = 00:30 UTC）
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Shanghai
+      AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+      DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+      ACCOUNTS_JSON: ${{ secrets.ACCOUNTS_JSON }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Prepare config from secrets
+        run: python scripts/ci_prepare.py
+
+      - name: Run daily report
+        run: python daily_run.py
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mailwatch-report-${{ github.run_number }}
+          path: reports/*.md
+          if-no-files-found: ignore
