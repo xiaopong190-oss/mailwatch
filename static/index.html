@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>亚马逊邮件分析系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #0e0f13;
+  --bg2: #16181f;
+  --bg3: #1e2028;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0f0f2;
+  --text2: #9a9ba8;
+  --text3: #5a5b68;
+  --accent: #6c8ef7;
+  --accent-bg: rgba(108,142,247,0.12);
+  --red: #f76c6c;
+  --red-bg: rgba(247,108,108,0.12);
+  --amber: #f7c46c;
+  --amber-bg: rgba(247,196,108,0.12);
+  --green: #6cf7a8;
+  --green-bg: rgba(108,247,168,0.12);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+::selection { background: var(--accent-bg); }
+input, select, button, textarea { font-family: inherit; }
+input[type=password]:not(:placeholder-shown) { letter-spacing: 3px; }
+.shell { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 0;
+}
+.logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.logo-mark { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 32px; height: 32px;
+  background: var(--accent-bg);
+  border: 1px solid rgba(108,142,247,0.3);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.logo-text { font-size: 13px; font-weight: 600; color: var(--text); }
+.logo-sub { font-size: 11px; color: var(--text3); margin-top: 1px; font-family: 'DM Mono', monospace; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 20px;
+  color: var(--text2);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+  font-size: 13px;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; }
+.sidebar-bottom { margin-top: auto; padding: 16px 20px 0; border-top: 1px solid var(--border); }
+.schedule-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+.dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.main { flex: 1; overflow-y: auto; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 16px; font-weight: 600; }
+.page-sub { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'DM Mono', monospace; }
+.topbar-actions { display: flex; gap: 8px; }
+.content { padding: 24px 28px; }
+.page { display: none; }
+.page.active { display: block; }
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::before { content: ''; width: 3px; height: 12px; background: var(--accent); border-radius: 2px; }
+.stats-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 16px; }
+.stats-row-2 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+.stat-val-sm { font-size: 22px; }
+.tag-cat-risk { background: var(--red-bg); color: var(--red); border: 1px solid rgba(247,108,108,0.25); }
+.tag-cat-account { background: rgba(255,120,80,0.15); color: #ff8866; border: 1px solid rgba(255,120,80,0.25); }
+.tag-cat-action { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(247,196,108,0.25); }
+.tag-cat-important { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(108,142,247,0.25); }
+.tag-cat-promo { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+.tag-sub { font-size: 10px; text-transform: none; letter-spacing: 0; }
+.stat {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.stat-val { font-size: 28px; font-weight: 300; font-family: 'DM Mono', monospace; }
+.stat-lbl { font-size: 11px; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+.stat.danger .stat-val { color: var(--red); }
+.stat.warn .stat-val { color: var(--amber); }
+.stat.ok .stat-val { color: var(--green); }
+.stat.account .stat-val { color: #ff8866; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border2);
+  background: transparent; color: var(--text);
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--bg3); }
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--accent-bg); border-color: rgba(108,142,247,0.3); color: var(--accent); }
+.btn-primary:hover { background: rgba(108,142,247,0.2); }
+.btn-danger { color: var(--red); border-color: rgba(247,108,108,0.3); }
+.btn-danger:hover { background: var(--red-bg); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.day-row { display: flex; gap: 10px; margin-top: 6px; }
+.day-row .btn-day {
+  flex: 1; justify-content: center; padding: 11px 12px;
+  font-size: 13px; font-weight: 500;
+  background: var(--bg3); border: 1px solid var(--border2);
+}
+.day-row .btn-day.active {
+  background: var(--accent-bg);
+  border-color: rgba(108,142,247,0.5);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(108,142,247,0.15);
+}
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+.field input, .field select {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text); font-size: 13px;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.field input:focus, .field select:focus { border-color: rgba(108,142,247,0.5); }
+.field select option { background: var(--bg3); }
+.hint { font-size: 11px; color: var(--text3); margin-top: 5px; font-family: 'DM Mono', monospace; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.account-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.account-section { margin-bottom: 20px; }
+.account-section:last-child { margin-bottom: 0; }
+.account-section-title {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  padding: 8px 0 10px; margin-bottom: 4px;
+  border-bottom: 1px solid rgba(108,142,247,0.2);
+  font-family: 'DM Mono', monospace;
+}
+.av {
+  width: 38px; height: 38px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
+  font-family: 'DM Mono', monospace;
+}
+.av-163 { background: var(--red-bg); color: var(--red); border: 1px solid rgba(247,108,108,0.2); }
+.av-gmail { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(108,142,247,0.2); }
+.av-126 { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(247,196,108,0.2); }
+.av-yeah { background: var(--green-bg); color: var(--green); border: 1px solid rgba(108,247,168,0.2); }
+.account-info { flex: 1; min-width: 0; }
+.account-name { font-size: 13px; font-weight: 500; }
+.account-meta { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.email-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.email-item.grouped {
+  background: rgba(108,142,247,0.04);
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  margin: 0 -12px;
+  border-left: 3px solid rgba(108,142,247,0.35);
+}
+.email-item.grouped .email-subject { color: var(--text); font-weight: 500; }
+.email-item:last-child { border-bottom: none; }
+.email-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.email-from { font-size: 13px; font-weight: 500; }
+.email-meta-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.email-acct { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+.email-time { font-size: 11px; color: var(--text3); }
+.email-subject { font-size: 13px; color: var(--text2); margin-bottom: 5px; }
+.email-summary { font-size: 12px; color: var(--text3); line-height: 1.6; margin-bottom: 7px; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.tag-urgent { background: var(--red-bg); color: var(--red); }
+.tag-order { background: var(--accent-bg); color: var(--accent); }
+.tag-warn { background: var(--amber-bg); color: var(--amber); }
+.tag-ok { background: var(--green-bg); color: var(--green); }
+.tag-gray { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+.toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.toggle-info .tlbl { font-size: 13px; font-weight: 500; }
+.toggle-info .tsub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.toggle { position: relative; width: 40px; height: 22px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.tslider { position: absolute; inset: 0; background: var(--bg3); border: 1px solid var(--border2); border-radius: 11px; cursor: pointer; transition: .2s; }
+.tslider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--text3); border-radius: 50%; transition: .2s; }
+.toggle input:checked + .tslider { background: var(--accent-bg); border-color: rgba(108,142,247,0.4); }
+.toggle input:checked + .tslider:before { transform: translateX(18px); background: var(--accent); }
+.chk-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; cursor: pointer; }
+.chk-item input { width: 14px; height: 14px; accent-color: var(--accent); }
+.loading-state { text-align: center; padding: 48px 0; color: var(--text3); }
+.loading-ring {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state { text-align: center; padding: 48px 0; color: var(--text3); }
+.empty-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
+.insight-box {
+  background: var(--bg3);
+  border: 1px solid rgba(108,142,247,0.15);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 13px; color: var(--text2);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.history-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.history-item:last-child { border-bottom: none; }
+.history-time { font-family: 'DM Mono', monospace; color: var(--text2); }
+.history-info { color: var(--text3); }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 10px 16px;
+  font-size: 13px; color: var(--text);
+  opacity: 0; transform: translateY(8px);
+  transition: all 0.2s; pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 20px;
+}
+.overlay.hidden { display: none; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 420px;
+}
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.modal-sub { font-size: 12px; color: var(--text3); margin-bottom: 18px; line-height: 1.5; }
+.steps { font-size: 12px; color: var(--text2); margin-top: 14px; line-height: 1.8; }
+.steps b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon">📬</div>
+        <div>
+          <div class="logo-text">MailWatch</div>
+          <div class="logo-sub">AMZ · 邮件分析</div>
+        </div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-item active" onclick="showPage('report', this)">
+        <span class="nav-icon">📊</span> 今日报告
+      </div>
+      <div class="nav-item" onclick="showPage('accounts', this)">
+        <span class="nav-icon">📮</span> 邮箱管理
+      </div>
+      <div class="nav-item" onclick="showPage('schedule', this)">
+        <span class="nav-icon">⏰</span> 定时设置
+      </div>
+      <div class="nav-item" onclick="showPage('settings', this)">
+        <span class="nav-icon">⚙</span> 设置
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="schedule-status">
+        <div class="dot" id="schedule-dot"></div>
+        <span id="schedule-label">定时未开启</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace" id="next-run-label"></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="topbar-title">今日报告</div>
+        <div class="page-sub" id="topbar-sub">邮件智能分析</div>
+      </div>
+      <div class="topbar-actions">
+        <span style="font-size:12px;color:var(--text3);align-self:center" id="last-run-txt"></span>
+        <button class="btn btn-primary" id="run-btn" onclick="runAnalysis()">⟳ 立即分析</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="page-report" class="page active">
+        <div class="card" id="analyze-panel">
+          <div class="card-title">邮件分析</div>
+          <div class="field" style="margin-bottom:18px">
+            <label style="font-size:13px;color:var(--text)">分析哪一天？</label>
+            <div class="day-row">
+              <button type="button" class="btn btn-day active" id="day-today" onclick="setAnalyzeDay('today')">📅 今日</button>
+              <button type="button" class="btn btn-day" id="day-yesterday" onclick="setAnalyzeDay('yesterday')">📅 昨日</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>分析重点（可选）</label>
+            <input type="text" id="report-focus" placeholder="如：差评、买家投诉、物流延误、账号警告" />
+          </div>
+          <div class="field">
+            <label>选择要分析的邮箱</label>
+            <div id="report-accounts" style="margin-top:4px"></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:4px;justify-content:center;padding:12px;font-size:14px" id="analyze-btn" onclick="runAnalysis()">
+            ▶ 开始分析今日邮件
+          </button>
+        </div>
+        <div id="report-body"></div>
+      </div>
+
+      <div id="page-accounts" class="page">
+        <div class="card">
+          <div class="card-title">添加邮箱</div>
+          <div class="field">
+            <label>邮箱类型</label>
+            <select id="add-type" onchange="onTypeChange()">
+              <option value="163">网易 163</option>
+              <option value="126">网易 126</option>
+              <option value="yeah">网易 yeah.net</option>
+              <option value="gmail">Gmail</option>
+            </select>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>邮箱地址</label>
+              <input type="email" id="add-email" placeholder="yourname@163.com" />
+            </div>
+            <div class="field">
+              <label id="pass-lbl">授权码（非登录密码）</label>
+              <input type="password" id="add-pass" placeholder="IMAP 授权码" />
+            </div>
+          </div>
+          <div class="field">
+            <label>备注名称（可选）</label>
+            <input type="text" id="add-name" placeholder="例：店铺A主邮箱" />
+          </div>
+          <p class="hint" id="type-hint">网易邮箱 → 设置 → POP3/SMTP/IMAP → 开启 IMAP → 获取授权码</p>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px;justify-content:center" onclick="addAccount()">+ 保存邮箱</button>
+        </div>
+        <div class="card">
+          <div class="card-title">已保存邮箱</div>
+          <p class="hint" style="margin:-8px 0 12px">保存在本机 accounts.json，网页分析与每日钉钉报告共用</p>
+          <div id="account-list">
+            <div class="empty-state" style="padding:20px 0">
+              <div style="font-size:12px">暂无邮箱，请在上方添加</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-schedule" class="page">
+        <div class="card">
+          <div class="card-title">定时分析</div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tlbl">启用每日自动分析</div>
+              <div class="tsub">需保持页面打开；整点前1分钟内检测</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="sched-on" onchange="saveSchedule()" />
+              <span class="tslider"></span>
+            </label>
+          </div>
+          <div style="height:14px"></div>
+          <div class="row2">
+            <div class="field">
+              <label>每天运行时间</label>
+              <input type="time" id="sched-time" value="08:30" onchange="saveSchedule()" />
+            </div>
+            <div class="field">
+              <label>分析重点（可选）</label>
+              <input type="text" id="sched-focus" placeholder="如：差评、买家投诉、物流" onchange="saveSchedule()" />
+            </div>
+          </div>
+          <div class="field">
+            <label>选择分析邮箱</label>
+            <div id="sched-accounts" style="margin-top:4px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">运行记录</div>
+          <div id="run-history">
+            <div class="empty-state" style="padding:16px 0"><div style="font-size:12px">暂无记录</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-settings" class="page">
+        <div class="card">
+          <div class="card-title">AI 分析引擎</div>
+          <div class="field">
+            <label>选择方案</label>
+            <div class="day-row" style="flex-wrap:wrap">
+              <button type="button" class="btn btn-day active" id="provider-deepseek" onclick="setAiProvider('deepseek')">DeepSeek（推荐）</button>
+              <button type="button" class="btn btn-day" id="provider-openai" onclick="setAiProvider('openai')">OpenAI 官方</button>
+            </div>
+          </div>
+          <div id="settings-deepseek-panel">
+            <div class="field">
+              <label>DeepSeek API Key</label>
+              <input type="password" id="settings-deepseek-api-key" placeholder="sk-... platform.deepseek.com 创建" autocomplete="off" />
+              <p class="hint" id="settings-deepseek-key-hint" style="margin-top:4px"></p>
+            </div>
+            <div class="field">
+              <label>API 地址</label>
+              <input type="text" id="settings-deepseek-base-url" value="https://api.deepseek.com" />
+            </div>
+            <div class="field">
+              <label>模型</label>
+              <input type="text" id="settings-deepseek-model" value="deepseek-chat" />
+            </div>
+            <p class="hint">推荐：便宜好用，无需本地 Proxy。到 platform.deepseek.com 注册并创建 API Key</p>
+          </div>
+          <div id="settings-openai-panel" style="display:none">
+            <div class="field">
+              <label>OpenAI API Key</label>
+              <input type="password" id="settings-api-key" placeholder="sk-..." />
+            </div>
+            <div class="field">
+              <label>模型</label>
+              <input type="text" id="settings-openai-model" value="gpt-4o-mini" />
+            </div>
+            <p class="hint">使用 OpenAI 官方账号，按量计费</p>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center" onclick="saveApiKeyFromSettings()">保存配置</button>
+          <button class="btn" style="width:100%;margin-top:8px;justify-content:center" onclick="testApi()">测试 API 连接</button>
+          <p class="hint" id="api-test-result" style="margin-top:10px"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay hidden" id="offline-overlay">
+  <div class="modal">
+    <div class="modal-title">请先启动 MailWatch</div>
+    <div class="modal-sub">双击文件夹里的 <b>启动 MailWatch.bat</b>，浏览器会自动打开本页面。</div>
+    <div class="steps">
+      <b>1.</b> 双击「启动 MailWatch.bat」<br>
+      <b>2.</b> 保持黑色窗口不要关<br>
+      <b>3.</b> 回到浏览器刷新此页
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:16px;justify-content:center" onclick="location.reload()">我已启动，刷新页面</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="setup-overlay">
+  <div class="modal">
+    <div class="modal-title">选择 AI 分析方案</div>
+    <div class="modal-sub">推荐 DeepSeek（填 Key 即用）。也可选 OpenAI 官方。</div>
+    <div class="field">
+      <div class="day-row" style="flex-wrap:wrap">
+        <button type="button" class="btn btn-day active" id="setup-provider-deepseek" onclick="setAiProvider('deepseek', 'setup')">DeepSeek</button>
+        <button type="button" class="btn btn-day" id="setup-provider-openai" onclick="setAiProvider('openai', 'setup')">OpenAI</button>
+      </div>
+    </div>
+    <div id="setup-deepseek-panel">
+      <div class="field">
+        <label>DeepSeek API Key</label>
+        <input type="password" id="setup-deepseek-api-key" placeholder="platform.deepseek.com" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>API 地址</label>
+        <input type="text" id="setup-deepseek-base-url" value="https://api.deepseek.com" />
+      </div>
+      <div class="field">
+        <label>模型</label>
+        <input type="text" id="setup-deepseek-model" value="deepseek-chat" />
+      </div>
+    </div>
+    <div id="setup-openai-panel" style="display:none">
+      <div class="field">
+        <label>OpenAI API Key</label>
+        <input type="password" id="setup-api-key" placeholder="sk-..." />
+      </div>
+      <div class="field">
+        <label>模型</label>
+        <input type="text" id="setup-openai-model" value="gpt-4o-mini" />
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:12px;justify-content:center" onclick="saveApiKey()">保存并开始使用</button>
+  </div>
+</div>
+
+<script>
+const TITLES = {
+  report: ['今日报告', '邮件智能分析'],
+  accounts: ['邮箱管理', '添加 / 删除邮箱账号'],
+  schedule: ['定时设置', '自动分析计划'],
+  settings: ['设置', 'AI 分析引擎']
+};
+
+const AI_PRESETS = {
+  deepseek: { provider: 'deepseek', api_key: '', base_url: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  openai: { provider: 'openai', api_key: '', base_url: '', model: 'gpt-4o-mini' }
+};
+const AI_PROVIDER_IDS = ['deepseek', 'openai'];
+const AI_PANEL_IDS = [
+  'setup-deepseek-panel','setup-openai-panel',
+  'settings-deepseek-panel','settings-openai-panel'
+];
+
+let accounts = [], schedule = { on: false, time: '08:30', focus: '', accts: [] }, history = [];
+let reportSelected = [], analyzeDay = 'today', aiProvider = 'deepseek';
+let schedTimer = null;
+
+function ls(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
+function lsSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+function normalizeAccount(a) {
+  return {
+    id: a.id,
+    type: a.type,
+    email: a.email,
+    pass: a.pass || a.password || '',
+    name: a.name || ''
+  };
+}
+
+async function init() {
+  await loadAccounts();
+  schedule = ls('mw-schedule', { on: false, time: '08:30', focus: '', accts: [] });
+  history = ls('mw-history', []);
+  reportSelected = ls('mw-report-selected', []);
+  analyzeDay = ls('mw-analyze-day', 'today');
+  setAnalyzeDay(analyzeDay, true);
+  const last = ls('mw-last-report', null);
+  renderReportAccounts();
+  document.getElementById('report-focus').value = schedule.focus || '';
+  if (last) renderReport(last, true);
+  else renderReportEmpty();
+  renderAccounts();
+  renderSchedulePage();
+  updateScheduleDot();
+  updateLastRunLabel();
+  startTimer();
+  bindApiKeyAutoSave();
+  bootCheck();
+}
+
+async function loadAccounts() {
+  try {
+    const res = await fetch('/api/accounts');
+    if (!res.ok) throw new Error('load failed');
+    const data = await res.json();
+    accounts = (data.accounts || []).map(normalizeAccount);
+
+    const local = ls('mw-accounts', []);
+    if (!accounts.length && local.length) {
+      for (const a of local) {
+        await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: a.type,
+            email: a.email,
+            password: a.pass,
+            name: a.name || ''
+          })
+        });
+      }
+      const res2 = await fetch('/api/accounts');
+      if (res2.ok) accounts = ((await res2.json()).accounts || []).map(normalizeAccount);
+      localStorage.removeItem('mw-accounts');
+      toast('已把浏览器里的邮箱同步到服务器 ✓');
+    }
+  } catch {
+    accounts = ls('mw-accounts', []);
+  }
+}
+
+async function bootCheck() {
+  try {
+    const health = await fetch('/health');
+    if (!health.ok) throw new Error('offline');
+    document.getElementById('offline-overlay').classList.add('hidden');
+
+    const cfg = await fetch('/config/status');
+    if (!cfg.ok) throw new Error('config');
+    const data = await cfg.json();
+    applyConfigToForm(data);
+    if (!data.configured) {
+      document.getElementById('setup-overlay').classList.remove('hidden');
+    } else {
+      document.getElementById('setup-overlay').classList.add('hidden');
+    }
+  } catch {
+    document.getElementById('offline-overlay').classList.remove('hidden');
+    document.getElementById('setup-overlay').classList.add('hidden');
+  }
+}
+
+function normalizeProvider(provider) {
+  if (provider === 'hermes' || provider === 'nous') return 'deepseek';
+  return AI_PROVIDER_IDS.includes(provider) ? provider : 'deepseek';
+}
+
+function panelProvider(id) {
+  if (id.includes('deepseek')) return 'deepseek';
+  if (id.includes('openai')) return 'openai';
+  return '';
+}
+
+function setAiProvider(provider, scope) {
+  aiProvider = normalizeProvider(provider);
+  const prefix = scope === 'setup' ? 'setup-' : '';
+  AI_PROVIDER_IDS.forEach(p => {
+    document.getElementById(prefix + 'provider-' + p)?.classList.toggle('active', aiProvider === p);
+  });
+
+  AI_PANEL_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const panelP = panelProvider(id);
+    const inScope = scope === 'setup' ? id.startsWith('setup-') : id.startsWith('settings-');
+    if (!scope) {
+      el.style.display = panelP === aiProvider ? '' : 'none';
+    } else if (inScope) {
+      el.style.display = panelP === aiProvider ? '' : 'none';
+    }
+  });
+
+  if (!scope) {
+    AI_PROVIDER_IDS.forEach(p => {
+      document.getElementById('provider-' + p)?.classList.toggle('active', aiProvider === p);
+      document.getElementById('setup-provider-' + p)?.classList.toggle('active', aiProvider === p);
+    });
+    AI_PANEL_IDS.filter(id => id.startsWith('settings-')).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = panelProvider(id) === aiProvider ? '' : 'none';
+    });
+    AI_PANEL_IDS.filter(id => id.startsWith('setup-')).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = panelProvider(id) === aiProvider ? '' : 'none';
+    });
+  }
+  if (aiProvider === 'deepseek') sanitizeDeepseekFields();
+}
+
+function fixDeepseekValues(model, base) {
+  let b = base || AI_PRESETS.deepseek.base_url;
+  let m = model || AI_PRESETS.deepseek.model;
+  if (b.includes('8645') || b.includes('127.0.0.1') || b.includes('localhost')) b = AI_PRESETS.deepseek.base_url;
+  if (!b.includes('deepseek.com')) b = AI_PRESETS.deepseek.base_url;
+  if (m.includes('stepfun/') || m.startsWith('Hermes-') || m.startsWith('gpt-')) m = AI_PRESETS.deepseek.model;
+  return { base: b, model: m };
+}
+
+function sanitizeDeepseekFields() {
+  const fixed = fixDeepseekValues(
+    document.getElementById('settings-deepseek-model')?.value || document.getElementById('setup-deepseek-model')?.value,
+    document.getElementById('settings-deepseek-base-url')?.value || document.getElementById('setup-deepseek-base-url')?.value
+  );
+  ['settings-deepseek-base-url', 'setup-deepseek-base-url'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = fixed.base;
+  });
+  ['settings-deepseek-model', 'setup-deepseek-model'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = fixed.model;
+  });
+}
+
+function updateApiKeyHints(configured) {
+  const deepseekHint = document.getElementById('settings-deepseek-key-hint');
+  if (deepseekHint) {
+    deepseekHint.textContent = configured
+      ? '✓ API Key 已保存，留空不会修改；输入新 Key 会自动保存'
+      : '输入 sk- 开头的 Key 后会自动保存';
+    deepseekHint.style.color = configured ? 'var(--green)' : 'var(--text3)';
+  }
+  const placeholders = configured
+    ? { deepseek: '已保存，留空不修改', openai: '已保存，留空不修改' }
+    : { deepseek: 'sk-... platform.deepseek.com 创建', openai: 'sk-...' };
+  const map = {
+    'settings-deepseek-api-key': placeholders.deepseek,
+    'setup-deepseek-api-key': placeholders.deepseek,
+    'settings-api-key': placeholders.openai,
+    'setup-api-key': placeholders.openai
+  };
+  Object.entries(map).forEach(([id, ph]) => {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = ph;
+  });
+}
+
+function applyConfigToForm(data) {
+  aiProvider = normalizeProvider(data.provider);
+  setAiProvider(aiProvider);
+  const model = data.model || '';
+  const base = data.base_url || '';
+  if (aiProvider === 'deepseek') {
+    const fixed = fixDeepseekValues(model, base);
+    document.getElementById('settings-deepseek-base-url').value = fixed.base;
+    document.getElementById('setup-deepseek-base-url').value = fixed.base;
+    document.getElementById('settings-deepseek-model').value = fixed.model;
+    document.getElementById('setup-deepseek-model').value = fixed.model;
+  }
+  AI_PROVIDER_IDS.forEach(p => {
+    if (p === 'deepseek') return;
+    const m = aiProvider === p ? (model || AI_PRESETS[p].model) : AI_PRESETS[p].model;
+    const el = document.getElementById('settings-' + p + '-model');
+    const el2 = document.getElementById('setup-' + p + '-model');
+    if (el) el.value = m;
+    if (el2) el2.value = m;
+  });
+  updateApiKeyHints(!!data.configured);
+}
+
+let apiKeySaveTimer = null;
+
+function bindApiKeyAutoSave() {
+  ['settings-deepseek-api-key', 'setup-deepseek-api-key', 'settings-api-key', 'setup-api-key'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el._mwBound) return;
+    el._mwBound = true;
+    const schedule = () => {
+      clearTimeout(apiKeySaveTimer);
+      const v = el.value.trim();
+      if (!v.startsWith('sk-') || v.length < 16) return;
+      apiKeySaveTimer = setTimeout(() => autoSaveApiKey(false), 600);
+    };
+    el.addEventListener('input', schedule);
+    el.addEventListener('blur', () => {
+      const v = el.value.trim();
+      if (v.startsWith('sk-') && v.length >= 16) autoSaveApiKey(false);
+    });
+  });
+}
+
+async function autoSaveApiKey(showToast) {
+  const payload = buildConfigPayload();
+  if (!payload.api_key || !payload.api_key.startsWith('sk-')) return false;
+  try {
+    const res = await fetch('/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) return false;
+    document.getElementById('setup-overlay').classList.add('hidden');
+    updateApiKeyHints(true);
+    if (showToast) toast(providerLabel(payload.provider) + ' 配置已保存 ✓');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildConfigPayload() {
+  if (aiProvider === 'deepseek') {
+    sanitizeDeepseekFields();
+    const fixed = fixDeepseekValues(
+      document.getElementById('settings-deepseek-model')?.value,
+      document.getElementById('settings-deepseek-base-url')?.value
+    );
+    return {
+      provider: 'deepseek',
+      api_key: (document.getElementById('settings-deepseek-api-key')?.value || document.getElementById('setup-deepseek-api-key')?.value || '').trim(),
+      base_url: fixed.base,
+      model: fixed.model
+    };
+  }
+  return {
+    provider: 'openai',
+    api_key: (document.getElementById('settings-api-key')?.value || document.getElementById('setup-api-key')?.value || '').trim(),
+    model: (document.getElementById('settings-openai-model')?.value || document.getElementById('setup-openai-model')?.value || AI_PRESETS.openai.model).trim(),
+    base_url: null
+  };
+}
+
+function providerLabel(provider) {
+  return { deepseek: 'DeepSeek', openai: 'OpenAI' }[provider] || provider;
+}
+
+async function saveApiKey() {
+  const payload = buildConfigPayload();
+  if (!payload.api_key) {
+    try {
+      const st = await fetch('/config/status');
+      if (st.ok) {
+        const s = await st.json();
+        if (!s.configured) {
+          toast('请填写 ' + providerLabel(payload.provider) + ' API Key');
+          return;
+        }
+      } else {
+        toast('请填写 ' + providerLabel(payload.provider) + ' API Key');
+        return;
+      }
+    } catch {
+      toast('请填写 ' + providerLabel(payload.provider) + ' API Key');
+      return;
+    }
+  } else if (!payload.api_key.startsWith('sk-')) {
+    toast(providerLabel(payload.provider) + ' 请填写 sk- 开头的 Key');
+    return;
+  }
+  try {
+    const res = await fetch('/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '保存失败');
+    }
+    document.getElementById('setup-overlay').classList.add('hidden');
+    updateApiKeyHints(true);
+    toast(providerLabel(payload.provider) + ' 配置已保存 ✓');
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+function renderReportAccounts() {
+  const el = document.getElementById('report-accounts');
+  if (!accounts.length) {
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">还没有邮箱</div>
+      <button class="btn btn-primary btn-sm" onclick="goAddAccount()">+ 去添加邮箱</button>`;
+    return;
+  }
+  if (!reportSelected.length) {
+    reportSelected = accounts.map(a => a.id);
+    lsSave('mw-report-selected', reportSelected);
+  }
+  el.innerHTML = accounts.map(a => `
+    <label class="chk-item">
+      <input type="checkbox" value="${a.id}" ${reportSelected.includes(a.id) ? 'checked' : ''} onchange="saveReportSelection()" />
+      <span>${a.name} <span style="color:var(--text3);font-size:11px;font-family:'DM Mono',monospace">${a.email}</span></span>
+    </label>
+  `).join('');
+}
+
+function saveReportSelection() {
+  const checks = document.querySelectorAll('#report-accounts input:checked');
+  reportSelected = Array.from(checks).map(c => parseInt(c.value));
+  lsSave('mw-report-selected', reportSelected);
+}
+
+function goAddAccount() {
+  showPage('accounts', document.querySelectorAll('.nav-item')[1]);
+}
+
+function dayLabel(day) {
+  return day === 'yesterday' ? '昨日' : '今日';
+}
+
+function setAnalyzeDay(day, silent) {
+  analyzeDay = day === 'yesterday' ? 'yesterday' : 'today';
+  lsSave('mw-analyze-day', analyzeDay);
+  document.getElementById('day-today').classList.toggle('active', analyzeDay === 'today');
+  document.getElementById('day-yesterday').classList.toggle('active', analyzeDay === 'yesterday');
+  const btn = document.getElementById('analyze-btn');
+  if (btn) btn.textContent = '▶ 开始分析' + dayLabel(analyzeDay) + '邮件';
+  const runBtn = document.getElementById('run-btn');
+  if (runBtn) runBtn.textContent = '⟳ 分析' + dayLabel(analyzeDay);
+  if (!silent) toast('已切换为' + dayLabel(analyzeDay) + '邮件');
+}
+
+function renderReportEmpty() {
+  document.getElementById('report-body').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <div style="font-size:14px;color:var(--text2);margin-bottom:6px">还没有分析结果</div>
+      <div style="font-size:12px">选择日期和邮箱，点击「开始分析${dayLabel(analyzeDay)}邮件」</div>
+    </div>`;
+}
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('topbar-title').textContent = TITLES[name][0];
+  document.getElementById('topbar-sub').textContent = TITLES[name][1];
+  document.getElementById('run-btn').style.display = name === 'report' ? '' : 'none';
+  if (name === 'schedule') renderSchedulePage();
+  if (name === 'settings') loadSettingsPage();
+}
+
+async function loadSettingsPage() {
+  try {
+    const res = await fetch('/config/status');
+    if (res.ok) applyConfigToForm(await res.json());
+  } catch {}
+}
+
+async function saveApiKeyFromSettings() {
+  await saveApiKey();
+}
+
+async function testApi() {
+  const el = document.getElementById('api-test-result');
+  el.textContent = '测试中...';
+  el.style.color = 'var(--text3)';
+  try {
+    sanitizeDeepseekFields();
+    const payload = buildConfigPayload();
+    const res = await fetch('/config/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(parseApiErrorText(text, res.status));
+    const data = JSON.parse(text);
+    try {
+      const saveRes = await fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (saveRes.ok) {
+        applyConfigToForm(data);
+        updateApiKeyHints(true);
+      }
+    } catch {}
+    el.textContent = `✓ ${data.provider} 连接正常 · ${data.base_url} · ${data.model} · 回复: ${data.reply}`;
+    el.style.color = 'var(--green)';
+  } catch (e) {
+    el.textContent = '✗ ' + (e.message || '连接失败');
+    el.style.color = 'var(--red)';
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function onTypeChange() {
+  const t = document.getElementById('add-type').value;
+  const em = document.getElementById('add-email');
+  const pl = document.getElementById('pass-lbl');
+  const hint = document.getElementById('type-hint');
+  if (t === 'gmail') {
+    em.placeholder = 'yourname@gmail.com';
+    pl.textContent = '应用专用密码';
+    hint.textContent = 'Google账号 → 安全性 → 两步验证 → 应用专用密码（16位字母）';
+  } else {
+    const d = { '163': '163.com', '126': '126.com', 'yeah': 'yeah.net' }[t];
+    em.placeholder = 'yourname@' + d;
+    pl.textContent = '授权码（非登录密码）';
+    hint.textContent = '网易邮箱 → 设置 → POP3/SMTP/IMAP → 开启 IMAP → 获取授权码';
+  }
+}
+
+async function addAccount() {
+  const type = document.getElementById('add-type').value;
+  const email = document.getElementById('add-email').value.trim();
+  const pass = document.getElementById('add-pass').value;
+  const name = document.getElementById('add-name').value.trim() || email.split('@')[0];
+  if (!email || !pass) { toast('请填写邮箱和授权码'); return; }
+  if (accounts.find(a => a.email === email)) { toast('该邮箱已存在'); return; }
+  try {
+    const res = await fetch('/api/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, email, password: pass, name })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '保存失败');
+    }
+    const saved = await res.json();
+    accounts.push(normalizeAccount(saved));
+    document.getElementById('add-email').value = '';
+    document.getElementById('add-pass').value = '';
+    document.getElementById('add-name').value = '';
+    renderAccounts();
+    renderReportAccounts();
+    renderSchedulePage();
+    toast('邮箱已保存 ✓（每日任务共用）');
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function removeAccount(id) {
+  if (!confirm('确认删除该邮箱？')) return;
+  try {
+    const res = await fetch('/api/accounts/' + id, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || '删除失败');
+    }
+    accounts = accounts.filter(a => a.id !== id);
+    renderAccounts();
+    renderReportAccounts();
+    renderSchedulePage();
+    toast('已删除');
+  } catch (e) {
+    toast(e.message || '删除失败');
+  }
+}
+
+function avClass(t) { return t === 'gmail' ? 'av-gmail' : t === '126' ? 'av-126' : t === 'yeah' ? 'av-yeah' : 'av-163'; }
+function avLabel(t) { return t === 'gmail' ? 'G' : t === '126' ? '126' : t === 'yeah' ? 'Y!' : '163'; }
+function typeName(t) { return { '163': '网易163', '126': '网易126', 'yeah': '网易yeah', 'gmail': 'Gmail' }[t] || t; }
+
+function renderAccounts() {
+  const el = document.getElementById('account-list');
+  if (!accounts.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div style="font-size:12px">暂无邮箱，请在上方添加</div></div>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">共 ${accounts.length} 个邮箱</div>` +
+    accounts.map(a => `
+    <div class="account-item">
+      <div class="av ${avClass(a.type)}">${avLabel(a.type)}</div>
+      <div class="account-info">
+        <div class="account-name">${a.name}</div>
+        <div class="account-meta">${typeName(a.type)} · ${a.email}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeAccount(${a.id})">删除</button>
+    </div>
+  `).join('');
+}
+
+function saveSchedule() {
+  schedule.on = document.getElementById('sched-on').checked;
+  schedule.time = document.getElementById('sched-time').value;
+  schedule.focus = document.getElementById('sched-focus').value;
+  const checks = document.querySelectorAll('#sched-accounts input:checked');
+  schedule.accts = Array.from(checks).map(c => parseInt(c.value));
+  lsSave('mw-schedule', schedule);
+  updateScheduleDot();
+  startTimer();
+}
+
+function renderSchedulePage() {
+  document.getElementById('sched-on').checked = schedule.on;
+  document.getElementById('sched-time').value = schedule.time || '08:30';
+  document.getElementById('sched-focus').value = schedule.focus || '';
+  const el = document.getElementById('sched-accounts');
+  if (!accounts.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3)">请先在「邮箱管理」添加邮箱</div>';
+  } else {
+    el.innerHTML = accounts.map(a => `
+      <label class="chk-item">
+        <input type="checkbox" value="${a.id}" ${(schedule.accts||[]).includes(a.id) ? 'checked' : ''} onchange="saveSchedule()" />
+        <span>${a.name} <span style="color:var(--text3);font-size:11px;font-family:'DM Mono',monospace">${a.email}</span></span>
+      </label>
+    `).join('');
+  }
+  const hist = document.getElementById('run-history');
+  if (!history.length) {
+    hist.innerHTML = '<div class="empty-state" style="padding:16px 0"><div style="font-size:12px">暂无记录</div></div>';
+  } else {
+    hist.innerHTML = history.slice(-8).reverse().map(h => `
+      <div class="history-item">
+        <span class="history-time">${h.time}</span>
+        <span class="history-info">${h.accts}个邮箱 · ${h.total}封邮件</span>
+        <span class="tag tag-ok">完成</span>
+      </div>
+    `).join('');
+  }
+}
+
+function updateScheduleDot() {
+  const dot = document.getElementById('schedule-dot');
+  const lbl = document.getElementById('schedule-label');
+  const nxt = document.getElementById('next-run-label');
+  if (schedule.on) {
+    dot.classList.add('on');
+    lbl.textContent = '定时已开启';
+    nxt.textContent = '每天 ' + (schedule.time || '08:30') + ' 运行';
+  } else {
+    dot.classList.remove('on');
+    lbl.textContent = '定时未开启';
+    nxt.textContent = '';
+  }
+}
+
+function updateLastRunLabel() {
+  const el = document.getElementById('last-run-txt');
+  if (history.length) el.textContent = '上次：' + history[history.length-1].time.split(' ')[1];
+  else el.textContent = '';
+}
+
+function startTimer() {
+  if (schedTimer) clearInterval(schedTimer);
+  if (!schedule.on) return;
+  schedTimer = setInterval(() => {
+    const now = new Date();
+    const cur = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    if (cur === schedule.time) {
+      const toRun = accounts.filter(a => (schedule.accts||[]).includes(a.id));
+      if (toRun.length) runAnalysis(toRun, schedule.focus, true);
+    }
+  }, 60000);
+}
+
+function parseApiErrorText(text, status) {
+  if (!text) return `请求失败 (${status})`;
+  try {
+    const err = JSON.parse(text);
+    if (typeof err.detail === 'string' && err.detail) return err.detail;
+    if (Array.isArray(err.detail)) {
+      return err.detail.map(d => d.msg || JSON.stringify(d)).join('; ');
+    }
+    if (err.detail) return JSON.stringify(err.detail);
+    return text.slice(0, 400);
+  } catch {
+    return text.slice(0, 400) || `请求失败 (${status})`;
+  }
+}
+
+async function runAnalysis(targetAccts, focusOverride, auto) {
+  showPage('report', document.querySelectorAll('.nav-item')[0]);
+
+  let toRun = targetAccts;
+  if (!toRun) {
+    toRun = accounts.filter(a => reportSelected.includes(a.id));
+  }
+  if (!toRun.length) {
+    toast('请先添加并选择邮箱');
+    goAddAccount();
+    return;
+  }
+
+  const focusInput = document.getElementById('report-focus');
+  const focus = focusOverride || (focusInput && focusInput.value.trim()) || schedule.focus || '亚马逊运营相关邮件';
+  if (focusInput && !focusOverride) schedule.focus = focus;
+  lsSave('mw-schedule', schedule);
+
+  document.getElementById('report-body').innerHTML = `
+    <div class="loading-state">
+      <div class="loading-ring"></div>
+      <div style="font-size:13px">正在读取并分析${dayLabel(analyzeDay)}邮件...</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace">${toRun.map(a=>a.name).join(' · ')}</div>
+    </div>`;
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accounts: toRun.map(a => ({
+          type: a.type,
+          email: a.email,
+          password: a.pass,
+          name: a.name
+        })),
+        focus,
+        max_emails: 50,
+        day: analyzeDay
+      })
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+      const msg = parseApiErrorText(text, res.status);
+      if (msg.includes('API Key')) {
+        document.getElementById('setup-overlay').classList.remove('hidden');
+      }
+      throw new Error(msg);
+    }
+
+    const parsed = JSON.parse(text);
+    lsSave('mw-last-report', parsed);
+    const now = new Date();
+    const ts = now.toLocaleDateString('zh-CN') + ' ' + now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+    history.push({ time: ts, accts: toRun.length, total: parsed.total });
+    lsSave('mw-history', history);
+    renderReport(parsed, false);
+    updateLastRunLabel();
+    if (auto) toast('定时分析完成 ✓');
+    else toast('分析完成 ✓');
+  } catch(e) {
+    document.getElementById('report-body').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠</div>
+        <div style="font-size:13px;color:var(--red)">分析失败</div>
+        <div style="font-size:11px;margin-top:6px;color:var(--text3);max-width:520px;margin-left:auto;margin-right:auto;word-break:break-word">${e.message||''}</div>
+        <div style="font-size:11px;margin-top:8px;color:var(--text3)">若提示 API 错误，请到「设置」检查 DeepSeek / OpenAI API Key</div>
+      </div>`;
+  }
+}
+
+function tagClass(tag) {
+  if (/差评|索赔|拒付|侵权|投诉|移除|恶意/.test(tag)) return 'tag-urgent tag-sub';
+  if (/账号|ODR|迟发|政策|审核|验证|健康/.test(tag)) return 'tag-cat-account tag-sub';
+  if (/买家|退货|退款|FBA|Case|发票/.test(tag)) return 'tag-warn tag-sub';
+  if (/库存|物流|账单|仓储|税务|供应链|付款/.test(tag)) return 'tag-order tag-sub';
+  if (/广告|促销|Coupon|Deal|SP|SB|SD/.test(tag)) return 'tag-gray tag-sub';
+  return 'tag-gray tag-sub';
+}
+
+function categoryClass(cat) {
+  const map = {
+    '风险邮件': 'tag-cat-risk',
+    '账号警告': 'tag-cat-account',
+    '待处理': 'tag-cat-action',
+    '重要邮件': 'tag-cat-important',
+    '广告通知': 'tag-cat-promo'
+  };
+  return map[cat] || 'tag-gray';
+}
+
+function categoryStats(data) {
+  const s = data.categoryStats || {};
+  return [
+    ['风险邮件', s['风险邮件'] || 0, 'danger'],
+    ['账号警告', s['账号警告'] || 0, 'account'],
+    ['待处理', s['待处理'] || 0, 'warn'],
+    ['重要邮件', s['重要邮件'] || 0, ''],
+    ['广告通知', s['广告通知'] || 0, 'ok']
+  ];
+}
+
+function groupByAccount(emails) {
+  const map = new Map();
+  for (const em of emails || []) {
+    const acct = em.account || '未分类邮箱';
+    if (!map.has(acct)) map.set(acct, []);
+    map.get(acct).push(em);
+  }
+  return Array.from(map.entries()).map(([account, items]) => ({ account, items }));
+}
+
+function renderEmailItem(em) {
+  if (em.grouped) {
+    return `
+    <div class="email-item grouped">
+      <div class="email-header">
+        <span class="email-from">📦 配送汇总</span>
+        <div class="email-meta-right">
+          <span class="tag tag-cat-important">配送</span>
+          <span class="email-time">${em.groupCount || ''} 封</span>
+        </div>
+      </div>
+      <div class="email-subject">${em.subject}</div>
+      <div class="email-summary">${em.summary}</div>
+    </div>`;
+  }
+  return `
+    <div class="email-item">
+      <div class="email-header">
+        <span class="email-from">${em.from}</span>
+        <div class="email-meta-right">
+          <span class="email-time">${em.time}</span>
+        </div>
+      </div>
+      <div class="email-subject">${em.subject}</div>
+      <div class="email-summary">${em.summary}</div>
+      <div class="tags">
+        ${em.category ? `<span class="tag ${categoryClass(em.category)}">${em.category}</span>` : ''}
+        ${(em.tags||[]).map(t=>`<span class="tag ${tagClass(t)}">${t}</span>`).join('')}
+        <span class="tag ${em.priority==='高'?'tag-urgent':em.priority==='中'?'tag-warn':'tag-gray'}">${em.priority}优先</span>
+      </div>
+    </div>`;
+}
+
+function renderReport(data, fromCache) {
+  const cacheNote = fromCache ? ' <span style="font-size:10px;color:var(--text3)">(缓存)</span>' : '';
+  const groupedNote = data.deliveryGrouped
+    ? ` · 配送 ${data.deliveryGrouped} 封已汇总`
+    : '';
+
+  const sections = groupByAccount(data.emails);
+  const multiAccount = sections.length > 1;
+
+  const emailList = sections.map(sec => {
+    const items = sec.items.map(renderEmailItem).join('');
+    if (multiAccount) {
+      return `
+      <div class="account-section">
+        <div class="account-section-title">📮 ${sec.account}</div>
+        ${items}
+      </div>`;
+    }
+    return items;
+  }).join('');
+
+  const catRow = categoryStats(data).map(([lbl, val, cls]) => `
+    <div class="stat ${cls}"><div class="stat-val stat-val-sm">${val}</div><div class="stat-lbl">${lbl}</div></div>
+  `).join('');
+
+  const dayTag = data.day === 'yesterday' ? '昨日' : (data.day === 'today' ? '今日' : '');
+  const dayPrefix = dayTag ? dayTag + ' · ' : '';
+  document.getElementById('report-body').innerHTML = `
+    <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:14px">${dayPrefix}${data.date}${cacheNote} · 共 ${data.total} 封${groupedNote}</div>
+    <div class="stats-row">${catRow}</div>
+    ${data.insight ? `<div class="insight-box">💡 ${data.insight}</div>` : ''}
+    <div class="card">
+      <div class="card-title">邮件明细</div>
+      ${emailList || '<div class="empty-state" style="padding:20px 0"><div style="font-size:12px">今日暂无邮件</div></div>'}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="exportReport()">↓ 导出报告</button>
+      <button class="btn" style="flex:1;justify-content:center" onclick="copyInsight()">⎘ 复制摘要</button>
+    </div>
+  `;
+}
+
+function exportReport() {
+  const data = ls('mw-last-report', null);
+  if (!data) return;
+  let txt = `亚马逊邮件分析报告 — ${data.date}\n${'='.repeat(40)}\n`;
+  const cs = data.categoryStats || {};
+  txt += `总计：${data.total}封 | 风险：${cs['风险邮件']||0} | 账号警告：${cs['账号警告']||0} | 待处理：${cs['待处理']||0} | 重要：${cs['重要邮件']||0} | 广告：${cs['广告通知']||0}\n\n`;
+  if (data.insight) txt += `【洞察】${data.insight}\n\n`;
+  txt += `【邮件明细】\n`;
+  const sections = groupByAccount(data.emails);
+  sections.forEach(sec => {
+    if (sections.length > 1) txt += `\n--- ${sec.account} ---\n`;
+    sec.items.forEach((em, i) => {
+      if (em.grouped) {
+        txt += `\n${i+1}. [配送汇总] ${em.groupCount||''}封 — ${em.summary}\n`;
+        return;
+      }
+      txt += `\n${i+1}. [${em.category||''}] [${em.priority}优先] ${em.from} · ${em.time}\n`;
+      txt += `   主题：${em.subject}\n`;
+      txt += `   摘要：${em.summary}\n`;
+      txt += `   标签：${(em.tags||[]).join(', ')}\n`;
+    });
+  });
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `邮件报告_${data.date}.txt`;
+  a.click();
+}
+
+function copyInsight() {
+  const data = ls('mw-last-report', null);
+  if (!data) return;
+  const txt = `【${data.date} 邮件摘要】共${data.total}封，紧急${data.urgent}封，待回复${data.needReply}封。${data.insight||''}`;
+  navigator.clipboard.writeText(txt).then(() => toast('摘要已复制 ✓'));
+}
+
+init();
+</script>
+</body>
+</html>

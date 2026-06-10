@@ -1,0 +1,31 @@
+MailWatch — 只读 · 分类 · 提醒
+==============================
+
+你要的流程（不用打开网页操作）：
+
+  定时任务 → IMAP 拉当天邮件 → 过滤亚马逊 → AI 分类 → 本地报告 → 钉钉
+
+【一次性配置】
+
+1. 双击「启动 MailWatch.bat」→ 左侧「邮箱管理」添加多个邮箱（自动保存到 accounts.json）
+   或手动复制 accounts.json.example → accounts.json
+
+2. AI 分析（网页「设置」二选一，推荐 DeepSeek）：
+   - DeepSeek：platform.deepseek.com 创建 API Key → 设置里填入 → 测试连接
+   - OpenAI 官方：填 sk- 开头的 Key
+
+3. 钉钉（可选）：.env 里填 DINGTALK_WEBHOOK
+
+【每天自动跑】
+
+  右键「安装定时任务.ps1」→ 使用 PowerShell 运行
+  （默认每天 8:30，也可双击「每日报告.bat」手动测试）
+
+【输出】
+
+  本地报告：reports/2026-05-29.md
+  钉钉群：自动推送 Markdown 日报
+
+【网页版（可选）】
+
+  双击「启动 MailWatch.bat」可手动查看界面，不是必须。

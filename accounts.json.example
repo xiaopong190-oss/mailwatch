@@ -1,0 +1,18 @@
+{
+  "focus": "亚马逊运营相关邮件",
+  "amazon_only": true,
+  "accounts": [
+    {
+      "type": "163",
+      "email": "yourname@163.com",
+      "password": "IMAP授权码",
+      "name": "店铺A"
+    },
+    {
+      "type": "gmail",
+      "email": "yourname@gmail.com",
+      "password": "应用专用密码",
+      "name": "店铺B"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+@echo off
+cd /d "%~dp0"
+call "%~dp0hermes-proxy.bat"

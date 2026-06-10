@@ -1,0 +1,22 @@
+# Secrets and local config
+.env
+accounts.json
+
+# Runtime / install artifacts
+.installed
+install.log
+reports/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.python-version
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
