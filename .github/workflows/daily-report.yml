@@ -1,13 +1,16 @@
 name: MailWatch Daily Report
 
 on:
-  schedule:
-    # 北京时间每天 08:30（UTC+8 = 00:30 UTC）
-    - cron: "30 0 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [daily-report]
 
 permissions:
   contents: read
+
+concurrency:
+  group: mailwatch-daily-report
+  cancel-in-progress: true
 
 jobs:
   daily:
@@ -24,6 +27,11 @@ jobs:
       ACCOUNTS_JSON: ${{ secrets.ACCOUNTS_JSON }}
 
     steps:
+      - name: Show run time
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          date '+%Y-%m-%d %H:%M:%S %Z'
+
       - name: Checkout
         uses: actions/checkout@v4
 

@@ -74,6 +74,29 @@ MailWatch — GitHub 云端定时（不用本地电脑）
   Win+R → taskschd.msc → 删除「MailWatch-Daily」
   以后只靠 GitHub 定时即可。
 
+【定时 8:30 没跑？逐项检查】
+
+  现已改为两个 workflow：
+    - MailWatch Schedule Trigger（每天约 8:32 北京时间触发）
+    - MailWatch Daily Report（真正跑邮件分析，由上面触发）
+
+  1. 推代码后等次日 8:30~8:45 看 Actions 是否有「Schedule Trigger」
+  2. 若仍没有 Scheduled 记录：Settings → Actions → General → 允许所有 actions
+  3. 手动测：先跑 Schedule Trigger，或直接跑 Daily Report
+  4. GitHub 定时本身不可靠，可备用外部定时（见下）
+
+【备用：外部网站定时触发（更稳）】
+
+  1. GitHub → Settings → Developer settings → Personal access tokens → 生成 token，勾选 repo + workflow
+  2. 打开 https://cron-job.org 注册，新建任务：
+     - URL: https://api.github.com/repos/xiaopong190-oss/mailwatch/dispatches
+     - Method: POST
+     - Headers: Authorization: Bearer 你的TOKEN
+                  Accept: application/vnd.github+json
+     - Body: {"event_type":"daily-report","client_payload":{}}
+     - 时间：每天 08:30 北京时间
+  3. daily-report.yml 已支持 repository_dispatch 接收上述请求
+
 【注意】
 
   1. 163/QQ 邮箱可能拦截海外 IP，GitHub 服务器在国外，若 IMAP 失败需在邮箱里开「客户端授权」或换 Gmail。
